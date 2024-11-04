@@ -13,34 +13,44 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
+
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.x'
-      - name: Install Dependencies
+
+      - name: Install Python Packages
         run: |
           python -m pip install --upgrade pip
           pip install requests
+
+      - name: Debug Environment
+        run: |
+          which python
+          python --version
+
       - name: Create Self-Service Action
         run: |
           import json
           import requests
-          
-          # Parse the JSON input to extract Port context
-          port_context = json.loads('${{ github.event.inputs.port_context }}')
+          import os
 
-          # Construct the SSA JSON using the port_context
+          # Fetch the port context from GitHub Actions input
+          port_context_json = '${{ github.event.inputs.port_context }}'
+          port_context = json.loads(port_context_json)
+
+          # Construct the SSA JSON using the port context
           ssa_data = {
-              "identifier": port_context['identifier'],  # Assuming identifier is part of the context
-              "title": port_context['title'],  # Assuming title is part of the context
-              "description": port_context.get('description', 'No description provided'),  # Optional description
+              "identifier": port_context['identifier'],  # Update as per your actual JSON structure
+              "title": port_context['title'],
+              "description": port_context.get('description', 'No description provided'),
               "trigger": {
                   "type": "self-service",
-                  "operation": port_context['operation'],  # Assuming operation type is provided
-                  "userInputs": port_context  # Using the entire context as userInputs
+                  "operation": port_context['operation'],
+                  "userInputs": port_context
               },
               "invocationMethod": {
-                  "type": port_context.get('invocation_type', 'RUN_GITHUB_ACTION'),  # Default invocation type
+                  "type": port_context.get('invocation_type', 'RUN_GITHUB_ACTION'),
                   "endpointUrl": port_context.get('webhook_endpoint_url', '')
               }
           }
@@ -49,13 +59,13 @@ jobs:
           response = requests.post(
               'https://api.getport.io/v1/actions',
               json=ssa_data,
-              headers={'Authorization': 'Bearer YOUR_PORT_API_TOKEN'}
+              headers={'Authorization': 'Bearer ' + os.getenv('YOUR_PORT_API_TOKEN')}
           )
-          
+
+          # Check response
           if response.status_code == 200:
               print('SSA created successfully')
           else:
               print('Failed to create SSA:', response.text)
-
-          env:
-            YOUR_PORT_API_TOKEN: ${{ secrets.PORT_API_TOKEN }}
+        env:
+          YOUR_PORT_API_TOKEN: ${{ secrets.PORT_API_TOKEN }}
