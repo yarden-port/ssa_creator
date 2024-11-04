@@ -3,34 +3,9 @@ name: Create Self-Service Action in Port
 on:
   workflow_dispatch:
     inputs:
-      action_title:
-        description: 'Action Title'
+      port_context:
+        description: 'Complete context from Port as JSON string'
         required: true
-      action_description:
-        description: 'Action Description'
-        required: true
-      action_type:
-        description: 'Action Type (e.g., Create, Day-2, Delete)'
-        required: true
-        default: 'Create'
-      blueprint:
-        description: 'Blueprint'
-        required: true
-      inputs:
-        description: 'Inputs as JSON'
-        required: true
-      invocation_type:
-        description: 'Invocation Type'
-        required: true
-      webhook_endpoint_url:
-        description: 'Webhook Endpoint URL'
-        required: false
-      github_repository:
-        description: 'GitHub Repository'
-        required: false
-      github_workflow_file_name:
-        description: 'GitHub Workflow File Name'
-        required: false
 
 jobs:
   create_ssa:
@@ -51,22 +26,26 @@ jobs:
           import json
           import requests
           
-          # Construct the SSA JSON
+          # Parse the JSON input to extract Port context
+          port_context = json.loads('${{ github.event.inputs.port_context }}')
+
+          # Construct the SSA JSON using the port_context
           ssa_data = {
-              "identifier": "${{ github.run_id }}",
-              "title": "${{ github.event.inputs.action_title }}",
-              "description": "${{ github.event.inputs.action_description }}",
+              "identifier": port_context['identifier'],  # Assuming identifier is part of the context
+              "title": port_context['title'],  # Assuming title is part of the context
+              "description": port_context.get('description', 'No description provided'),  # Optional description
               "trigger": {
                   "type": "self-service",
-                  "operation": "${{ github.event.inputs.action_type }}",  # Dynamically assigned based on input
-                  "userInputs": json.loads('${{ github.event.inputs.inputs }}')
+                  "operation": port_context['operation'],  # Assuming operation type is provided
+                  "userInputs": port_context  # Using the entire context as userInputs
               },
               "invocationMethod": {
-                  "type": "${{ github.event.inputs.invocation_type }}",
-                  "endpointUrl": "${{ github.event.inputs.webhook_endpoint_url }}"
+                  "type": port_context.get('invocation_type', 'RUN_GITHUB_ACTION'),  # Default invocation type
+                  "endpointUrl": port_context.get('webhook_endpoint_url', '')
               }
           }
 
+          # Post request to Port's API
           response = requests.post(
               'https://api.getport.io/v1/actions',
               json=ssa_data,
